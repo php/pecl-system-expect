@@ -49,8 +49,21 @@ zend_module_entry expect_module_entry = {
 ZEND_GET_MODULE(expect)
 #endif
 
+
+/* {{{ PHP_INI_MH
+ *  */
+static PHP_INI_MH(OnSetExpectTimeout)
+{
+	exp_timeout = atoi(new_value);
+	return SUCCESS;
+}
+/* }}} */
+
+
 PHP_INI_BEGIN()
+	PHP_INI_ENTRY("expect.timeout", "0", PHP_INI_ALL, OnSetExpectTimeout)
 PHP_INI_END()
+
 
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(expect)
@@ -129,7 +142,6 @@ PHP_FUNCTION(expect_expectl)
 	zval *z_stream, ***args, **result;
 	php_stream *stream;
 	int fd, key, i;
-	HashTable values;
 	
 	int argc = ZEND_NUM_ARGS();
 	if (argc < 2 || (argc-1) % 3 != 0) { WRONG_PARAM_COUNT; }
@@ -151,7 +163,6 @@ PHP_FUNCTION(expect_expectl)
 	}
 
 	expectl_args = (void **) emalloc (sizeof(void *) * argc);
-	zend_hash_init (&values, 0, NULL, ZVAL_PTR_DTOR, 0);
 
 	for (i=1; i+2<argc; i+=3)
 	{
@@ -176,22 +187,17 @@ PHP_FUNCTION(expect_expectl)
 		expectl_args[i+1] = (void *)Z_STRVAL_PP(args[i+1]);
 
 		/* Get value */
-		key = zend_hash_num_elements (&values);
-		zend_hash_next_index_insert (&values, &args[i+2], sizeof(zval *), NULL);
-		expectl_args[i+2] = (void *)key;
+		expectl_args[i+2] = (void *)(i+2);
 	}
 
-	key = vexp_expectl (fd, expectl_args, argc-1);
-
-	if (zend_hash_index_find (&values, key, (void **)&result) == SUCCESS) {
-		*return_value = *(*result);
+	i = vexp_expectl (fd, expectl_args, argc-1);
+	if (i > 1 && i < argc) {
+		*return_value = **args[i];
 		zval_copy_ctor (return_value);
 	}
 	else {
-		RETURN_LONG (key);
+		RETURN_LONG (i);
 	}
-
-	zend_hash_destroy (&values);
 }
 /* }}} */
 

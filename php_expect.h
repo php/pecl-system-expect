@@ -54,7 +54,7 @@ static int vexp_expectl(int fd, void **a, int c);
 
 #ifdef ZTS
 #include "TSRM.h"
-#endif
+#endif /* ZTS */
 
 #endif /* PHP_EXPECT_H */
 
