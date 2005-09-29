@@ -46,8 +46,11 @@ PHP_MSHUTDOWN_FUNCTION(expect);
 PHP_MINFO_FUNCTION(expect);
 
 PHP_FUNCTION(expect_popen);
+PHP_FUNCTION(expect_expectl);
 
 extern php_stream_wrapper php_expect_wrapper;
+
+static int vexp_expectl(int fd, void **a, int c);
 
 #ifdef ZTS
 #include "TSRM.h"
