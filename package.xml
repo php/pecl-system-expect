@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE package SYSTEM "http://pear.php.net/dtd/package-1.0">
+<package>
+  <name>expect</name>
+  <summary>PHP extension for expect library</summary>
+  <description>This extension allows to interact with processes through PTY, using expect library.</description>
+  <license>PHP License</license>
+  <maintainers>
+	<maintainer>
+		<user>michael</user>
+		<name>Michael Spector</name>
+		<email>michael@php.net</email>
+	</maintainer>
+  </maintainers>
+
+  <release>
+    <version>0.0.1</version>
+    <date>2005-09-29</date>
+    <state>alpha</state>
+  </release>
+
+  <filelist>
+    <dir role="doc" name="/">
+      <file role="src">config.m4</file>
+      <file role="src">expect.dsp</file>
+      <file role="src">config.w32</file>
+      <file role="src">expect.c</file>
+      <file role="src">expect_fopen_wrapper.c</file>
+      <file role="src">php_expect.h</file>
+    </dir>
+  </filelist>
+</package>
