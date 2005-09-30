@@ -162,7 +162,7 @@ PHP_FUNCTION(expect_expectl)
 		return;
 	}
 
-	expectl_args = (void **) emalloc (sizeof(void *) * argc);
+	expectl_args = (void **) safe_emalloc (argc, sizeof(void *), 0);
 
 	for (i=1; i+2<argc; i+=3)
 	{
