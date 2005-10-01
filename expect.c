@@ -54,7 +54,31 @@ ZEND_GET_MODULE(expect)
  *  */
 static PHP_INI_MH(OnSetExpectTimeout)
 {
-	exp_timeout = atoi(new_value);
+	return OnUpdateLong (entry, new_value, new_value_length, &exp_timeout, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
+
+/* {{{ PHP_INI_MH
+ *  */
+static PHP_INI_MH(OnSetExpectLogUser)
+{
+	return OnUpdateBool (entry, new_value, new_value_length, &exp_loguser, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
+
+/* {{{ PHP_INI_MH
+ *  */
+static PHP_INI_MH(OnSetExpectLogFile)
+{
+	if (new_value_length > 0) {
+		exp_logfile = fopen (new_value, "a");
+		if (!exp_logfile) {
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "could not open log file for writting");
+			return FAILURE;
+		}
+	}
 	return SUCCESS;
 }
 /* }}} */
@@ -62,6 +86,8 @@ static PHP_INI_MH(OnSetExpectTimeout)
 
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY("expect.timeout", "10", PHP_INI_ALL, OnSetExpectTimeout)
+	PHP_INI_ENTRY_EX("expect.loguser", "1", PHP_INI_ALL, OnSetExpectLogUser, php_ini_boolean_displayer_cb)
+	PHP_INI_ENTRY("expect.logfile", "", PHP_INI_ALL, OnSetExpectLogFile)
 PHP_INI_END()
 
 
