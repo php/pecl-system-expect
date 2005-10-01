@@ -61,7 +61,7 @@ static PHP_INI_MH(OnSetExpectTimeout)
 
 
 PHP_INI_BEGIN()
-	PHP_INI_ENTRY("expect.timeout", "0", PHP_INI_ALL, OnSetExpectTimeout)
+	PHP_INI_ENTRY("expect.timeout", "10", PHP_INI_ALL, OnSetExpectTimeout)
 PHP_INI_END()
 
 
@@ -70,9 +70,12 @@ PHP_MINIT_FUNCTION(expect)
 {
 	php_register_url_stream_wrapper("expect", &php_expect_wrapper TSRMLS_CC);
 
-	REGISTER_LONG_CONSTANT("EXPECT_GLOB", exp_glob, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("EXPECT_EXACT", exp_exact, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("EXPECT_REGEXP", exp_regexp, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_GLOB", exp_glob, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_EXACT", exp_exact, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_REGEXP", exp_regexp, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_EOF", EXP_EOF, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_TIMEOUT", EXP_TIMEOUT, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("EXP_FULLBUFFER", EXP_FULLBUFFER, CONST_CS | CONST_PERSISTENT);
 
 	REGISTER_INI_ENTRIES();
 	
@@ -134,112 +137,105 @@ PHP_FUNCTION(expect_popen)
 
 
 /* {{{
- * proto mixed expect_expectl (resource stream, integer type1, string regexp1, mixed value1, ...)
+ * proto mixed expect_expectl (resource stream, array expect_cases)
  */
 PHP_FUNCTION(expect_expectl)
 {
-	void **expectl_args = NULL;
-	zval *z_stream, ***args, **result;
+	struct exp_case *ecases, *ec;
+	zval *z_stream, *z_cases, **z_case, **z_value;
 	php_stream *stream;
-	int fd, key, i;
+	int fd, argc;
+	ulong key;
 	
-	int argc = ZEND_NUM_ARGS();
-	if (argc < 2 || (argc-1) % 3 != 0) { WRONG_PARAM_COUNT; }
+	if (ZEND_NUM_ARGS() != 2) { WRONG_PARAM_COUNT; }
 
-	if (zend_parse_parameters (1 TSRMLS_CC, "r", &z_stream) == FAILURE) {
+	if (zend_parse_parameters (ZEND_NUM_ARGS() TSRMLS_CC, "ra", &z_stream, &z_cases) == FAILURE) {
 		return;
 	}
 
 	php_stream_from_zval (stream, &z_stream);
 	if (php_stream_cast (stream, PHP_STREAM_AS_FD, (void*)&fd, 1) != SUCCESS || fd < 0) {
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "Couldn't cast expect stream to a file descriptor");
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "couldn't cast expect stream to a file descriptor");
 			return;
 	}
 
-	args = (zval ***) emalloc (sizeof(zval **) * argc);
-	if (zend_get_parameters_array_ex (argc, args) == FAILURE) {
-		efree (args);
-		return;
-	}
+	argc = zend_hash_num_elements (Z_ARRVAL_P(z_cases));
+	ecases = (struct exp_case*) safe_emalloc (argc + 1, sizeof(struct exp_case), 0);
 
-	expectl_args = (void **) safe_emalloc (argc, sizeof(void *), 0);
+	ec = ecases;
+	zend_hash_internal_pointer_reset (Z_ARRVAL_P(z_cases));
 
-	for (i=1; i+2<argc; i+=3)
+	while (zend_hash_get_current_data (Z_ARRVAL_P(z_cases), (void **)&z_case) == SUCCESS)
 	{
-		/* Get expression type */
-		if (Z_TYPE_PP(args[i]) != IS_LONG || (Z_LVAL_PP(args[i]) != exp_glob && Z_LVAL_PP(args[i]) != exp_exact 
-			&& Z_LVAL_PP(args[i]) != exp_regexp))
-		{
-			efree (expectl_args);
-			efree (args);
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "Expression type must be either EXPECT_GLOB, EXPECT_EXACT or EXPECT_REGEXP");
+		zval **z_pattern, **z_exp_type;
+		zend_hash_get_current_key(Z_ARRVAL_P(z_cases), NULL, &key, 0);
+
+		if (Z_TYPE_PP(z_case) != IS_ARRAY) {
+			efree (ecases);
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression case must be an array");
 			return;
 		}
-		expectl_args[i] = (void *)Z_LVAL_PP(args[i]);
 
-		/* Get expression */
-		if (Z_TYPE_PP(args[i+1]) != IS_STRING) {
-			efree (expectl_args);
-			efree (args);
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "Regular expression must be string value");
+		ec->re = NULL;
+		ec->type = exp_glob;
+
+		/* Gather pattern */
+		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 0, (void **)&z_pattern) != SUCCESS) {
+			efree (ecases);
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "missing parameter for pattern at index: 0");
 			return;
 		}
-		expectl_args[i+1] = (void *)Z_STRVAL_PP(args[i+1]);
+		if (Z_TYPE_PP(z_pattern) != IS_STRING) {
+			efree (ecases);
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "pattern must be of string type");
+			return;
+		}
+		ec->pattern = Z_STRVAL_PP(z_pattern);
 
-		/* Get value */
-		expectl_args[i+2] = (void *)(i+2);
+		/* Gather value */
+		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) != SUCCESS) {
+			efree (ecases);
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "missing parameter for value at index: 1");
+			return;
+		}
+		ec->value = key;
+
+		/* Gather expression type (optional, default: EXPECT_GLOB) */
+		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 2, (void **)&z_exp_type) == SUCCESS) {
+			if (Z_TYPE_PP(z_exp_type) != IS_LONG) {
+				efree (ecases);
+				php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression type must be an integer constant");
+				return;
+			}
+			if (Z_LVAL_PP(z_exp_type) != exp_glob && Z_LVAL_PP(z_exp_type) != exp_exact && Z_LVAL_PP(z_exp_type) != exp_regexp) {
+				efree (ecases);
+				php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression type must be either EXPECT_GLOB, EXPECT_EXACT or EXPECT_REGEXP");
+				return;
+			}
+			ec->type = Z_LVAL_PP(z_exp_type);
+		}
+
+		ec++;
+		zend_hash_move_forward(Z_ARRVAL_P(z_cases));
 	}
+	ec->type = exp_end;
 
-	i = vexp_expectl (fd, expectl_args, argc-1);
-	if (i > 1 && i < argc) {
-		*return_value = **args[i];
-		zval_copy_ctor (return_value);
+	key = exp_expectv (fd, ecases);
+
+	if (zend_hash_index_find (Z_ARRVAL_P(z_cases), key, (void **)&z_case) == SUCCESS) {
+		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) == SUCCESS) {
+			*return_value = **z_value;
+			zval_copy_ctor (return_value);
+		}
 	}
 	else {
-		RETURN_LONG (i);
+		RETURN_LONG (key);
 	}
+
+	efree (ecases);
 }
 /* }}} */
 
-
-static int vexp_expectl(int fd, void **a, int c)
-{
-	switch (c) {
-		case 3: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), exp_end);
-		case 6: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), exp_end);
-		case 9: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), exp_end);
-		case 12: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), exp_end);
-		case 15: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), exp_end);
-		case 18: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), exp_end);
-		case 21: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), exp_end);
-		case 24: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), exp_end);
-		case 27: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), exp_end);
-		case 30: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), exp_end);
-		case 33: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), exp_end);
-		case 36: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), exp_end);
-		case 39: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), exp_end);
-		case 42: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), exp_end);
-		case 45: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), exp_end);
-		case 48: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), exp_end);
-		case 51: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), exp_end);
-		case 54: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), exp_end);
-		case 57: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), exp_end);
-		case 60: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), exp_end);
-		case 63: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), exp_end);
-		case 66: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), exp_end);
-		case 69: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), exp_end);
-		case 72: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), exp_end);
-		case 75: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), exp_end);
-		case 78: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), exp_end);
-		case 81: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), exp_end);
-		case 84: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), exp_end);
-		case 87: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), *(a+84), *(a+85), *(a+86), exp_end);
-		case 90: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), *(a+84), *(a+85), *(a+86), *(a+87), *(a+88), *(a+89), exp_end);
-		case 93: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), *(a+84), *(a+85), *(a+86), *(a+87), *(a+88), *(a+89), *(a+90), *(a+91), *(a+92), exp_end);
-		case 96: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), *(a+84), *(a+85), *(a+86), *(a+87), *(a+88), *(a+89), *(a+90), *(a+91), *(a+92), *(a+93), *(a+94), *(a+95), exp_end);
-		case 99: return exp_expectl(fd, *(a+0), *(a+1), *(a+2), *(a+3), *(a+4), *(a+5), *(a+6), *(a+7), *(a+8), *(a+9), *(a+10), *(a+11), *(a+12), *(a+13), *(a+14), *(a+15), *(a+16), *(a+17), *(a+18), *(a+19), *(a+20), *(a+21), *(a+22), *(a+23), *(a+24), *(a+25), *(a+26), *(a+27), *(a+28), *(a+29), *(a+30), *(a+31), *(a+32), *(a+33), *(a+34), *(a+35), *(a+36), *(a+37), *(a+38), *(a+39), *(a+40), *(a+41), *(a+42), *(a+43), *(a+44), *(a+45), *(a+46), *(a+47), *(a+48), *(a+49), *(a+50), *(a+51), *(a+52), *(a+53), *(a+54), *(a+55), *(a+56), *(a+57), *(a+58), *(a+59), *(a+60), *(a+61), *(a+62), *(a+63), *(a+64), *(a+65), *(a+66), *(a+67), *(a+68), *(a+69), *(a+70), *(a+71), *(a+72), *(a+73), *(a+74), *(a+75), *(a+76), *(a+77), *(a+78), *(a+79), *(a+80), *(a+81), *(a+82), *(a+83), *(a+84), *(a+85), *(a+86), *(a+87), *(a+88), *(a+89), *(a+90), *(a+91), *(a+92), *(a+93), *(a+94), *(a+95), *(a+96), *(a+97), *(a+98), exp_end);
-	}
-}
 
 /*
  * Local variables:
