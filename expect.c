@@ -49,12 +49,15 @@ zend_module_entry expect_module_entry = {
 ZEND_GET_MODULE(expect)
 #endif
 
+#ifdef ZEND_ENGINE_2
+#define OnUpdateInt OnUpdateLong
+#endif
 
 /* {{{ PHP_INI_MH
  *  */
 static PHP_INI_MH(OnSetExpectTimeout)
 {
-	return OnUpdateLong (entry, new_value, new_value_length, &exp_timeout, mh_arg2, mh_arg3, stage TSRMLS_CC);
+	return OnUpdateInt (entry, new_value, new_value_length, &exp_timeout, mh_arg2, mh_arg3, stage TSRMLS_CC);
 }
 /* }}} */
 
