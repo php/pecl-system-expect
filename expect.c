@@ -201,7 +201,7 @@ PHP_FUNCTION(expect_expectl)
 
 		if (Z_TYPE_PP(z_case) != IS_ARRAY) {
 			efree (ecases);
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression case must be an array");
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "expect case must be an array");
 			return;
 		}
 
