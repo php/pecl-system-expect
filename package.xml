@@ -14,10 +14,10 @@
 	</maintainers>
 
 	<release>
-		<version>0.1</version>
-		<date>2005-10-01</date>
+		<version>0.2</version>
+		<date>2005-11-12</date>
 		<state>beta</state>
-		<notes>Initial release. Try it out!</notes>
+		<notes>Fixed #5941</notes>
 	</release>
 
 	<filelist>
