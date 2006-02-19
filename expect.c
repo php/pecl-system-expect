@@ -23,7 +23,7 @@
 /* {{{ expect_functions[] */
 function_entry expect_functions[] = {
 	PHP_FE(expect_popen,	NULL)
-	PHP_FE(expect_expectl,	NULL)
+	PHP_FE(expect_expectl,	third_arg_force_ref)
 	{ NULL, NULL, NULL }
 };
 /* }}} */
@@ -170,19 +170,19 @@ PHP_FUNCTION(expect_popen)
 
 
 /* {{{
- * proto mixed expect_expectl (resource stream, array expect_cases)
+ * proto mixed expect_expectl (resource stream, array expect_cases [, string match])
  */
 PHP_FUNCTION(expect_expectl)
 {
 	struct exp_case *ecases, *ec;
-	zval *z_stream, *z_cases, **z_case, **z_value;
+	zval *z_stream, *z_cases, *z_match=NULL, **z_case, **z_value;
 	php_stream *stream;
 	int fd, argc;
 	ulong key;
 	
-	if (ZEND_NUM_ARGS() != 2) { WRONG_PARAM_COUNT; }
+	if (ZEND_NUM_ARGS() < 2 || ZEND_NUM_ARGS() > 3) { WRONG_PARAM_COUNT; }
 
-	if (zend_parse_parameters (ZEND_NUM_ARGS() TSRMLS_CC, "ra", &z_stream, &z_cases) == FAILURE) {
+	if (zend_parse_parameters (ZEND_NUM_ARGS() TSRMLS_CC, "ra|z", &z_stream, &z_cases, &z_match) == FAILURE) {
 		return;
 	}
 
@@ -253,7 +253,17 @@ PHP_FUNCTION(expect_expectl)
 	}
 	ec->type = exp_end;
 
+	struct exp_case *ec1 = ecases;
 	key = exp_expectv (fd, ecases);
+
+	int exp_match_len = exp_match_end - exp_match;
+	if (z_match && exp_match && exp_match_len > 0) {
+		zval_dtor (z_match);
+		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_end - exp_match + 1));
+		strncpy (tmp, exp_match, exp_match_len);
+		ZVAL_STRING (z_match, tmp, 1);
+		efree (tmp);
+	}
 
 	if (zend_hash_index_find (Z_ARRVAL_P(z_cases), key, (void **)&z_case) == SUCCESS) {
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) == SUCCESS) {
