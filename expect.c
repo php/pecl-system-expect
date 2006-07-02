@@ -257,9 +257,8 @@ PHP_FUNCTION(expect_expectl)
 
 	int exp_match_len = exp_match_end - exp_match;
 	if (z_match && exp_match && exp_match_len > 0) {
-		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_end - exp_match + 1));
-		strncpy (tmp, exp_match, exp_match_len);
-		tmp[exp_match_len] = '\0';
+		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
+		strlcpy (tmp, exp_match, exp_match_len + 1);
 		zval_dtor (z_match);
 		ZVAL_STRING (z_match, tmp, 1);
 		efree (tmp);
