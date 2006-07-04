@@ -170,11 +170,11 @@ PHP_FUNCTION(expect_popen)
 
 
 /* {{{
- * proto mixed expect_expectl (resource stream, array expect_cases [, string match])
+ * proto mixed expect_expectl (resource stream, array expect_cases [, array match])
  */
 PHP_FUNCTION(expect_expectl)
 {
-	struct exp_case *ecases, *ec;
+	struct exp_case *ecases, *ec, matchedcase;
 	zval *z_stream, *z_cases, *z_match=NULL, **z_case, **z_value;
 	php_stream *stream;
 	int fd, argc;
@@ -255,12 +255,30 @@ PHP_FUNCTION(expect_expectl)
 
 	key = exp_expectv (fd, ecases);
 
-	int exp_match_len = exp_match_end - exp_match;
+	int exp_match_len = exp_match_end - exp_match + 1;
 	if (z_match && exp_match && exp_match_len > 0) {
-		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
-		strlcpy (tmp, exp_match, exp_match_len + 1);
+		char *tmp = (char *)emalloc (sizeof(char) * exp_match_len);
+		strlcpy (tmp, exp_match, exp_match_len);
 		zval_dtor (z_match);
-		ZVAL_STRING (z_match, tmp, 1);
+		array_init(z_match);
+		add_index_string(z_match, 0, tmp, 1);
+		/* Get case that was matched */
+		matchedcase = ecases[key];
+		/* If there are subpattern matches ... */
+		if (matchedcase.re->startp != NULL) {
+			int i;
+			/* iterate across all possible 9 subpatterns (a limitation of libexpect)
+			   and add matching substring to matches array */
+			for (i = 1; i <= 9; i++) {
+				if (matchedcase.re->startp[i] != NULL) {
+					int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i] + 1;
+					char *sub_match = (char *)emalloc (sizeof(char) * sub_match_len);
+					strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len);
+					add_next_index_string(z_match, sub_match, 1);
+					efree (sub_match);
+				}
+			}
+		}
 		efree (tmp);
 	}
 
