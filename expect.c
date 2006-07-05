@@ -255,10 +255,10 @@ PHP_FUNCTION(expect_expectl)
 
 	key = exp_expectv (fd, ecases);
 
-	int exp_match_len = exp_match_end - exp_match + 1;
+	int exp_match_len = exp_match_end - exp_match;
 	if (z_match && exp_match && exp_match_len > 0) {
-		char *tmp = (char *)emalloc (sizeof(char) * exp_match_len);
-		strlcpy (tmp, exp_match, exp_match_len);
+		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
+		strlcpy (tmp, exp_match, exp_match_len + 1);
 		zval_dtor (z_match);
 		array_init(z_match);
 		add_index_string(z_match, 0, tmp, 1);
@@ -271,9 +271,9 @@ PHP_FUNCTION(expect_expectl)
 			   and add matching substring to matches array */
 			for (i = 1; i <= 9; i++) {
 				if (matchedcase.re->startp[i] != NULL) {
-					int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i] + 1;
-					char *sub_match = (char *)emalloc (sizeof(char) * sub_match_len);
-					strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len);
+					int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i];
+					char *sub_match = (char *)emalloc (sizeof(char) * (sub_match_len + 1));
+					strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len + 1);
 					add_next_index_string(z_match, sub_match, 1);
 					efree (sub_match);
 				}
