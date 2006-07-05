@@ -14,11 +14,10 @@
 	</maintainers>
 
 	<release>
-		<version>0.2.1</version>
-		<date>2006-07-04</date>
+		<version>0.2.2</version>
+		<date>2006-07-05</date>
 		<state>beta</state>
-		<notes>1) Support returning match substrings in array.
-		2) Fix missing null-termination in returned match string.
+		<notes>Fix segfault on scenario with EXP_TIMEOUT.
 		</notes>
 	</release>
 
