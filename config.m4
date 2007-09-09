@@ -13,10 +13,6 @@ if test "$PHP_EXPECT" != "no"; then
     fi
   done
 
-  if test -z "$LIBEXPECT_DIR"; then
-    AC_MSG_ERROR(expect extension requires libexpect version >= 5.43.0)
-  fi
-
   PHP_ADD_LIBRARY_WITH_PATH(expect, $LIBEXPECT_DIR/lib, EXPECT_SHARED_LIBADD)
   PHP_ADD_INCLUDE($LIBEXPECT_DIR/include)
 

@@ -21,26 +21,43 @@
 #include "php.h"
 #include "php_expect.h"
 #include "php_streams.h"
+#include <sys/wait.h>
 
-php_stream *php_expect_stream_opener (php_stream_wrapper *wrapper, char *command, char *mode, int options, 
+php_stream *php_expect_stream_open (php_stream_wrapper *wrapper, char *command, char *mode, int options, 
 							  char **opened_command, php_stream_context *context STREAMS_DC TSRMLS_DC)
 {
 	FILE *fp;
-
 	if (strncasecmp("expect://", command, sizeof("expect://")-1) == 0) {
 		command += sizeof("expect://")-1;
 	} 
 
 	if ((fp = exp_popen(command)) != NULL) {
-		return php_stream_fopen_from_pipe (fp, "");
+		php_stream* stream = php_stream_fopen_from_pipe (fp, mode);
+		zval *z_pid;
+		MAKE_STD_ZVAL (z_pid);
+		ZVAL_LONG (z_pid, exp_pid);
+		stream->wrapperdata = z_pid;
+		return stream;
 	}
 	
 	return NULL;
 }
 
+static int php_expect_stream_close (php_stream_wrapper *wrapper, php_stream *stream TSRMLS_DC)
+{
+	zval* z_pid = stream->wrapperdata;
+	int s = 0;
+	waitpid (Z_LVAL_P(z_pid), &s, 0);
+	zval_ptr_dtor (&z_pid);
+	stream->wrapperdata = NULL;
+	return s;
+}
+/* }}} */
+
+
 static php_stream_wrapper_ops php_expect_wrapper_ops = {
-	php_expect_stream_opener,
-	NULL, /* close */
+	php_expect_stream_open,
+	php_expect_stream_close, /* close */
 	NULL, /* stat */
 	NULL, /* stat_url */
 	NULL, /* opendir */
