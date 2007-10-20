@@ -14,10 +14,10 @@
 	</maintainers>
 
 	<release>
-		<version>0.2.2</version>
-		<date>2006-07-05</date>
+		<version>0.2.4</version>
+		<date>2007-10-20</date>
 		<state>beta</state>
-		<notes>Fix segfault on scenario with EXP_TIMEOUT.
+		<notes>Fixed #12268 (Capturing output via exp_loguser from within PHP / Apache)
 		</notes>
 	</release>
 

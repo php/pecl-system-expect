@@ -80,11 +80,19 @@ static PHP_INI_MH(OnSetExpectLogUser)
 static PHP_INI_MH(OnSetExpectLogFile)
 {
 	if (new_value_length > 0) {
-		exp_logfile = fopen (new_value, "a");
-		if (!exp_logfile) {
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "could not open log file for writting");
+		php_stream *stream = php_stream_open_wrapper (new_value, "a", 0, NULL);
+		if (!stream) {
+			php_error_docref (NULL TSRMLS_CC, E_ERROR, "could not open log file for writing");
 			return FAILURE;
 		}
+		stream->flags |= PHP_STREAM_FLAG_NO_SEEK;
+		if (php_stream_cast(stream, PHP_STREAM_AS_STDIO, (void **) &exp_logfile, REPORT_ERRORS) != SUCCESS) {
+			return FAILURE;
+		}
+		exp_logfile_all = 1;
+	} else {
+		exp_logfile = NULL;
+		exp_logfile_all = 0;
 	}
 	return SUCCESS;
 }
@@ -187,9 +195,8 @@ PHP_FUNCTION(expect_expectl)
 	}
 
 	php_stream_from_zval (stream, &z_stream);
-	if (php_stream_cast (stream, PHP_STREAM_AS_FD, (void*)&fd, 1) != SUCCESS || fd < 0) {
-			php_error_docref (NULL TSRMLS_CC, E_ERROR, "couldn't cast expect stream to a file descriptor");
-			return;
+	if (php_stream_cast (stream, PHP_STREAM_AS_FD, (void*)&fd, REPORT_ERRORS) != SUCCESS || fd < 0) {
+		return;
 	}
 
 	argc = zend_hash_num_elements (Z_ARRVAL_P(z_cases));
