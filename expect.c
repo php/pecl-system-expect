@@ -19,6 +19,8 @@
 /* $ Id: $ */ 
 
 #include "php_expect.h"
+#include <string.h>
+#include <errno.h>
 
 /* {{{ expect_functions[] */
 function_entry expect_functions[] = {
@@ -172,6 +174,7 @@ PHP_FUNCTION(expect_popen)
 	if (!stream) {
 		RETURN_FALSE;
 	}
+	stream->flags |= PHP_STREAM_FLAG_NO_SEEK;
 	php_stream_to_zval(stream, return_value);
 }
 /* }}} */
