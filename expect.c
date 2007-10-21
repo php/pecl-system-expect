@@ -174,7 +174,14 @@ PHP_FUNCTION(expect_popen)
 	if (!stream) {
 		RETURN_FALSE;
 	}
+
 	stream->flags |= PHP_STREAM_FLAG_NO_SEEK;
+
+	zval *z_pid;
+	MAKE_STD_ZVAL (z_pid);
+	ZVAL_LONG (z_pid, exp_pid);
+	stream->wrapperdata = z_pid;
+
 	php_stream_to_zval(stream, return_value);
 }
 /* }}} */
@@ -198,6 +205,12 @@ PHP_FUNCTION(expect_expectl)
 	}
 
 	php_stream_from_zval (stream, &z_stream);
+
+	if (!stream->wrapperdata) {
+		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
+		return;
+	}
+
 	if (php_stream_cast (stream, PHP_STREAM_AS_FD, (void*)&fd, REPORT_ERRORS) != SUCCESS || fd < 0) {
 		return;
 	}
