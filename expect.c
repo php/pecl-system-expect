@@ -161,6 +161,7 @@ PHP_FUNCTION(expect_popen)
 	int command_len;
 	FILE *fp;
 	php_stream *stream = NULL;
+	zval *z_pid;
 
 	if (ZEND_NUM_ARGS() != 1) { WRONG_PARAM_COUNT; }
 
@@ -177,7 +178,6 @@ PHP_FUNCTION(expect_popen)
 
 	stream->flags |= PHP_STREAM_FLAG_NO_SEEK;
 
-	zval *z_pid;
 	MAKE_STD_ZVAL (z_pid);
 	ZVAL_LONG (z_pid, exp_pid);
 	stream->wrapperdata = z_pid;
