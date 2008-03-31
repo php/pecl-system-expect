@@ -42,7 +42,7 @@ zend_module_entry expect_module_entry = {
 	NULL,
 	NULL,
 	PHP_MINFO(expect),
-	"0.1", 
+	PHP_EXPECT_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 /* }}} */
@@ -143,7 +143,8 @@ PHP_MSHUTDOWN_FUNCTION(expect)
 PHP_MINFO_FUNCTION(expect)
 {
 	php_info_print_table_start();
-	php_info_print_table_row(2, "Expect support", "enabled");
+	php_info_print_table_header(2, "Expect support", "enabled");
+	php_info_print_table_row(2, "Version", PHP_EXPECT_VERSION);
 	php_info_print_table_row(2, "Stream wrapper support", "expect://");
 	php_info_print_table_end();
 
