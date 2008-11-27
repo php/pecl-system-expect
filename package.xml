@@ -14,10 +14,10 @@
 	</maintainers>
 
 	<release>
-		<version>0.2.4</version>
-		<date>2007-10-20</date>
+		<version>0.2.5</version>
+		<date>2008-11-27</date>
 		<state>beta</state>
-		<notes>Fixed #12268 (Capturing output via exp_loguser from within PHP / Apache)
+		<notes>Fixed bug #14768 (configure error in Ubuntu 8.04)
 		</notes>
 	</release>
 
