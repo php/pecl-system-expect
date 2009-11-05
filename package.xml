@@ -1,34 +1,53 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE package SYSTEM "http://pear.php.net/dtd/package-1.0">
-<package>
-	<name>expect</name>
-	<summary>PHP extension for expect library</summary>
-	<description>This extension allows to interact with processes through PTY, using expect library.</description>
-	<license>PHP License</license>
-	<maintainers>
-		<maintainer>
-			<user>michael</user>
-			<name>Michael Spector</name>
-			<email>michael@php.net</email>
-		</maintainer>
-	</maintainers>
-
-	<release>
-		<version>0.2.5</version>
-		<date>2008-11-27</date>
-		<state>beta</state>
-		<notes>Fixed bug #14768 (configure error in Ubuntu 8.04)
-		</notes>
-	</release>
-
-	<filelist>
-		<dir role="doc" name="/">
-			<file role="src">config.m4</file>
-			<file role="src">expect.dsp</file>
-			<file role="src">config.w32</file>
-			<file role="src">expect.c</file>
-			<file role="src">expect_fopen_wrapper.c</file>
-			<file role="src">php_expect.h</file>
-		</dir>
-	</filelist>
+<?xml version="1.0" encoding="UTF-8"?>
+<package packagerversion="1.9.0" version="2.0" xmlns="http://pear.php.net/dtd/package-2.0" xmlns:tasks="http://pear.php.net/dtd/tasks-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0
+http://pear.php.net/dtd/tasks-1.0.xsd
+http://pear.php.net/dtd/package-2.0
+http://pear.php.net/dtd/package-2.0.xsd">
+ <name>expect</name>
+ <channel>pecl.php.net</channel>
+ <summary>PHP extension for expect library</summary>
+ <description>This extension allows to interact with processes through PTY, using expect library.
+ </description>
+ <lead>
+  <name>Michael Spector</name>
+  <user>michael</user>
+  <email>michael@php.net</email>
+  <active>yes</active>
+ </lead>
+ <date>2009-11-05</date>
+ <time>12:48:54</time>
+ <version>
+  <release>0.2.5</release>
+  <api>0.2.5</api>
+ </version>
+ <stability>
+  <release>beta</release>
+  <api>beta</api>
+ </stability>
+ <license uri="http://www.php.net/license">PHP License</license>
+ <notes>
+Fixed bug #14768 (configure error in Ubuntu 8.04)
+ </notes>
+ <contents>
+  <dir name="/">
+   <file name="config.m4" role="src" />
+   <file name="config.w32" role="src" />
+   <file name="expect.c" role="src" />
+   <file name="expect.dsp" role="src" />
+   <file name="expect_fopen_wrapper.c" role="src" />
+   <file name="php_expect.h" role="src" />
+  </dir> <!-- / -->
+ </contents>
+ <dependencies>
+  <required>
+   <php>
+    <min>4.0.0</min>
+   </php>
+   <pearinstaller>
+    <min>1.4.0b1</min>
+   </pearinstaller>
+  </required>
+ </dependencies>
+ <providesextension>expect</providesextension>
+ <extsrcrelease />
 </package>
