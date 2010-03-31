@@ -33,7 +33,7 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_expect_expectl, 0, 0, 2)
 ZEND_END_ARG_INFO()
 
 /* {{{ expect_functions[] */
-function_entry expect_functions[] = {
+zend_function_entry expect_functions[] = {
 	PHP_FE(expect_popen,    arginfo_expect_popen)
 	PHP_FE(expect_expectl,  arginfo_expect_expectl)
 	{ NULL, NULL, NULL }
