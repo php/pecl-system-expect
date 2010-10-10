@@ -14,11 +14,11 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <email>michael@php.net</email>
   <active>yes</active>
  </lead>
- <date>2009-11-05</date>
- <time>12:48:54</time>
+ <date>2010-10-10</date>
+ <time>09:28:00</time>
  <version>
-  <release>0.2.5</release>
-  <api>0.2.5</api>
+  <release>0.2.6</release>
+  <api>0.2.6</api>
  </version>
  <stability>
   <release>beta</release>
@@ -26,7 +26,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
  </stability>
  <license uri="http://www.php.net/license">PHP License</license>
  <notes>
-Fixed bug #14768 (configure error in Ubuntu 8.04)
+Fixed bug #18998 (Change expect.logfile on runtime leave file descriptor opened)
  </notes>
  <contents>
   <dir name="/">

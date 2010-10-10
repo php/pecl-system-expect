@@ -35,7 +35,7 @@
 extern zend_module_entry expect_module_entry;
 #define phpext_expect_ptr &expect_module_entry
 
-#define PHP_EXPECT_VERSION "0.2.5-dev"
+#define PHP_EXPECT_VERSION "0.2.6-dev"
 
 #ifdef PHP_WIN32
 #define PHP_EXPECT_API __declspec(dllexport)
@@ -51,6 +51,16 @@ PHP_FUNCTION(expect_popen);
 PHP_FUNCTION(expect_expectl);
 
 extern php_stream_wrapper php_expect_wrapper;
+
+ZEND_BEGIN_MODULE_GLOBALS(expect)
+	php_stream* logfile_stream;
+ZEND_END_MODULE_GLOBALS(expect)
+
+#ifdef ZTS
+#define EXPECT_G(v) TSRMG(expect_globals_id, zend_expect_globals *, v)
+#else
+#define EXPECT_G(v) (expect_globals.v)
+#endif
 
 #ifdef ZTS
 #include "TSRM.h"

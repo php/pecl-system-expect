@@ -61,6 +61,26 @@ zend_module_entry expect_module_entry = {
 ZEND_GET_MODULE(expect)
 #endif
 
+ZEND_DECLARE_MODULE_GLOBALS(expect)
+
+/* {{{ php_expect_init_globals
+ */
+static void php_expect_init_globals (zend_expect_globals *globals TSRMLS_DC)
+{
+	globals->logfile_stream = NULL;
+}
+/* }}} */
+
+/* {{{ php_expect_destroy_globals
+ */
+static void php_expect_destroy_globals(zend_expect_globals *globals TSRMLS_DC)
+{
+	if (globals->logfile_stream) {
+		php_stream_close(globals->logfile_stream);
+	}
+}
+/* }}} */
+
 /* {{{ PHP_INI_MH
  *  */
 static PHP_INI_MH(OnSetExpectTimeout)
@@ -91,8 +111,11 @@ static PHP_INI_MH(OnSetExpectLogUser)
  *  */
 static PHP_INI_MH(OnSetExpectLogFile)
 {
+	if (EXPECT_G(logfile_stream)) {
+		php_stream_close(EXPECT_G(logfile_stream));
+	}
 	if (new_value_length > 0) {
-		php_stream *stream = php_stream_open_wrapper (new_value, "a", 0, NULL);
+		php_stream* stream = php_stream_open_wrapper (new_value, "a", 0, NULL);
 		if (!stream) {
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "could not open log file for writing");
 			return FAILURE;
@@ -101,8 +124,10 @@ static PHP_INI_MH(OnSetExpectLogFile)
 		if (php_stream_cast(stream, PHP_STREAM_AS_STDIO, (void **) &exp_logfile, REPORT_ERRORS) != SUCCESS) {
 			return FAILURE;
 		}
+		EXPECT_G(logfile_stream) = stream;
 		exp_logfile_all = 1;
 	} else {
+		EXPECT_G(logfile_stream) = NULL;
 		exp_logfile = NULL;
 		exp_logfile_all = 0;
 	}
