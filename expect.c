@@ -91,6 +91,16 @@ static PHP_INI_MH(OnSetExpectTimeout)
 }
 /* }}} */
 
+/* {{{ PHP_INI_MH
+ *  */
+static PHP_INI_MH(OnSetExpectMatchMax)
+{
+	if (new_value) {
+		exp_match_max = atoi(new_value);
+	}
+}
+/* }}} */
+
 
 /* {{{ PHP_INI_MH
  *  */
@@ -140,6 +150,7 @@ PHP_INI_BEGIN()
 	PHP_INI_ENTRY("expect.timeout", "10", PHP_INI_ALL, OnSetExpectTimeout)
 	PHP_INI_ENTRY_EX("expect.loguser", "1", PHP_INI_ALL, OnSetExpectLogUser, php_ini_boolean_displayer_cb)
 	PHP_INI_ENTRY("expect.logfile", "", PHP_INI_ALL, OnSetExpectLogFile)
+	PHP_INI_ENTRY("expect.match_max", "", PHP_INI_ALL, OnSetExpectMatchMax)
 PHP_INI_END()
 
 
