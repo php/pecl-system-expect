@@ -1,7 +1,7 @@
 --TEST--
 PECL Bug #22566 CGI
 --SKIPIF--
-<?php if (!extension_loaded("expect") || php_sapi_name() == 'cli') print "skip"; ?>
+<?php if (!extension_loaded("expect")) print "skip"; ?>
 --FILE--
 <?php
 var_dump(ini_set('expect.timeout', 3));

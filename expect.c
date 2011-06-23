@@ -173,6 +173,18 @@ PHP_MINIT_FUNCTION(expect)
 	REGISTER_LONG_CONSTANT("EXP_FULLBUFFER", EXP_FULLBUFFER, CONST_CS | CONST_PERSISTENT);
 
 	REGISTER_INI_ENTRIES();
+
+	Tcl_Interp *interp = Tcl_CreateInterp();
+	if (Tcl_Init(interp) == TCL_ERROR) {
+		php_error_docref (NULL TSRMLS_CC, E_ERROR, 
+			"Unable to initialize TCL interpreter: %s", Tcl_GetStringResult (interp));
+		return FAILURE;
+	}
+	if (Expect_Init(interp) == TCL_ERROR) {
+		php_error_docref (NULL TSRMLS_CC, E_ERROR,
+			"Unable to initialize Expect: %s", Tcl_GetStringResult (interp));
+		return FAILURE;
+	}
 	
 	return SUCCESS;
 }
@@ -261,6 +273,8 @@ PHP_FUNCTION(expect_expectl)
 
 	if (!stream->wrapperdata) {
 		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
+		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
+		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
 		return;
 	}
 
@@ -327,15 +341,15 @@ PHP_FUNCTION(expect_expectl)
 		ecases_ptr++;
 		zend_hash_move_forward(Z_ARRVAL_P(z_cases));
 	}
-	ecases_ptr->pattern = estrdup("");
+	ecases_ptr->pattern = NULL;
+	ecases_ptr->re = NULL;
+	ecases_ptr->value = NULL;
 	ecases_ptr->type = exp_end;
 
 	key = exp_expectv (fd, ecases);
 
-	efree(ecases_ptr->pattern);
-
 	int exp_match_len = exp_match_end - exp_match;
-	if (z_match && exp_match && exp_match_len > 0) {
+	if (key >= 0 && z_match && exp_match && exp_match_len > 0) {
 		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
 		strlcpy (tmp, exp_match, exp_match_len + 1);
 		zval_dtor (z_match);
@@ -344,7 +358,7 @@ PHP_FUNCTION(expect_expectl)
 		/* Get case that was matched */
 		matchedcase = ecases[key];
 		/* If there are subpattern matches ... */
-		if (matchedcase.re->startp != NULL) {
+		if (matchedcase.re != NULL && matchedcase.re->startp != NULL) {
 			int i;
 			/* iterate across all possible 9 subpatterns (a limitation of libexpect)
 			   and add matching substring to matches array */
@@ -369,6 +383,15 @@ PHP_FUNCTION(expect_expectl)
 	}
 	else {
 		RETURN_LONG (key);
+	}
+
+	// Free compiled patterns:
+	ecases_ptr = ecases;
+	while (ecases_ptr != NULL && ecases_ptr->type != exp_end) {
+		if (ecases_ptr->re != NULL) {
+			free(ecases_ptr->re);
+		}
+		ecases_ptr++;
 	}
 
 	efree (ecases);

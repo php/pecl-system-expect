@@ -14,11 +14,11 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <email>michael@php.net</email>
   <active>yes</active>
  </lead>
- <date>2011-01-25</date>
- <time>23:07:00</time>
+ <date>2011-06-23</date>
+ <time>23:40:00</time>
  <version>
-  <release>0.2.9</release>
-  <api>0.2.9</api>
+  <release>0.3.0</release>
+  <api>0.3.0</api>
  </version>
  <stability>
   <release>beta</release>
@@ -26,7 +26,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
  </stability>
  <license uri="http://www.php.net/license">PHP License</license>
  <notes>
-Provide a default value for expect.match_max (Bug #21823)
+Fixed setting INI parameters (Bug #22566)
+Fixed Segmentation Fault on use (Bug #21578)
  </notes>
  <contents>
   <dir name="/">

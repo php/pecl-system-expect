@@ -30,6 +30,8 @@
 #include <SAPI.h>
 #include <ext/standard/info.h>
 
+#include <tcl.h>
+#include <expect_tcl.h>
 #include <expect.h>
 
 extern zend_module_entry expect_module_entry;
