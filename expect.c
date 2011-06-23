@@ -87,7 +87,9 @@ static PHP_INI_MH(OnSetExpectTimeout)
 {
 	if (new_value) {
 		exp_timeout = atoi(new_value);
+		return SUCCESS;
 	}
+	return FAILURE;
 }
 /* }}} */
 
@@ -97,7 +99,9 @@ static PHP_INI_MH(OnSetExpectMatchMax)
 {
 	if (new_value) {
 		exp_match_max = atoi(new_value);
+		return SUCCESS;
 	}
+	return FAILURE;
 }
 /* }}} */
 
@@ -112,7 +116,9 @@ static PHP_INI_MH(OnSetExpectLogUser)
 		} else {
 			exp_loguser = 1;
 		}
+		return SUCCESS;
 	}
+	return FAILURE;
 }
 /* }}} */
 
@@ -239,7 +245,7 @@ PHP_FUNCTION(expect_popen)
  */
 PHP_FUNCTION(expect_expectl)
 {
-	struct exp_case *ecases, *ec, matchedcase;
+	struct exp_case *ecases, *ecases_ptr, matchedcase;
 	zval *z_stream, *z_cases, *z_match=NULL, **z_case, **z_value;
 	php_stream *stream;
 	int fd, argc;
@@ -264,8 +270,8 @@ PHP_FUNCTION(expect_expectl)
 
 	argc = zend_hash_num_elements (Z_ARRVAL_P(z_cases));
 	ecases = (struct exp_case*) safe_emalloc (argc + 1, sizeof(struct exp_case), 0);
+	ecases_ptr = ecases;
 
-	ec = ecases;
 	zend_hash_internal_pointer_reset (Z_ARRVAL_P(z_cases));
 
 	while (zend_hash_get_current_data (Z_ARRVAL_P(z_cases), (void **)&z_case) == SUCCESS)
@@ -279,8 +285,8 @@ PHP_FUNCTION(expect_expectl)
 			return;
 		}
 
-		ec->re = NULL;
-		ec->type = exp_glob;
+		ecases_ptr->re = NULL;
+		ecases_ptr->type = exp_glob;
 
 		/* Gather pattern */
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 0, (void **)&z_pattern) != SUCCESS) {
@@ -293,7 +299,7 @@ PHP_FUNCTION(expect_expectl)
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "pattern must be of string type");
 			return;
 		}
-		ec->pattern = Z_STRVAL_PP(z_pattern);
+		ecases_ptr->pattern = Z_STRVAL_PP(z_pattern);
 
 		/* Gather value */
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) != SUCCESS) {
@@ -301,7 +307,7 @@ PHP_FUNCTION(expect_expectl)
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "missing parameter for value at index: 1");
 			return;
 		}
-		ec->value = key;
+		ecases_ptr->value = key;
 
 		/* Gather expression type (optional, default: EXPECT_GLOB) */
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 2, (void **)&z_exp_type) == SUCCESS) {
@@ -315,15 +321,18 @@ PHP_FUNCTION(expect_expectl)
 				php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression type must be either EXPECT_GLOB, EXPECT_EXACT or EXPECT_REGEXP");
 				return;
 			}
-			ec->type = Z_LVAL_PP(z_exp_type);
+			ecases_ptr->type = Z_LVAL_PP(z_exp_type);
 		}
 
-		ec++;
+		ecases_ptr++;
 		zend_hash_move_forward(Z_ARRVAL_P(z_cases));
 	}
-	ec->type = exp_end;
+	ecases_ptr->pattern = estrdup("");
+	ecases_ptr->type = exp_end;
 
 	key = exp_expectv (fd, ecases);
+
+	efree(ecases_ptr->pattern);
 
 	int exp_match_len = exp_match_end - exp_match;
 	if (z_match && exp_match && exp_match_len > 0) {
