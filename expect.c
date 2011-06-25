@@ -273,8 +273,6 @@ PHP_FUNCTION(expect_expectl)
 
 	if (!stream->wrapperdata) {
 		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
-		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
-		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
 		return;
 	}
 
