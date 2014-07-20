@@ -111,10 +111,13 @@ static PHP_INI_MH(OnSetExpectMatchMax)
 static PHP_INI_MH(OnSetExpectLogUser)
 {
 	if (new_value) {
-		if (strncasecmp("on", new_value, sizeof("on"))) {
-			exp_loguser = atoi(new_value);
-		} else {
+		if (strncasecmp("on", new_value, sizeof("on")) == 0
+			|| strncasecmp("true", new_value, sizeof("true")) == 0
+			|| strncasecmp("yes", new_value, sizeof("yes")) == 0
+			|| strncasecmp("1", new_value, sizeof("1")) == 0) {
 			exp_loguser = 1;
+		} else {
+			exp_loguser = 0;
 		}
 		return SUCCESS;
 	}
