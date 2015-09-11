@@ -36,6 +36,15 @@ http://pear.php.net/dtd/package-2.0.xsd">
    <file name="expect.dsp" role="src" />
    <file name="expect_fopen_wrapper.c" role="src" />
    <file name="php_expect.h" role="src" />
+   <file name="LICENSE" role="doc" />
+   <dir name="tests">
+     <file name="bug12268.phpt" role="test" />
+     <file name="bug22566.phpt" role="test" />
+     <file name="bug6996.phpt" role="test" />
+     <file name="expect_expectl.phpt" role="test" />
+     <file name="expect_popen.phpt" role="test" />
+     <file name="expect_wrapper.phpt" role="test" />
+   </dir>
   </dir> <!-- / -->
  </contents>
  <dependencies>
