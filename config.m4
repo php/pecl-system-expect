@@ -21,7 +21,9 @@ if test "$PHP_EXPECT" != "no"; then
     fi
   done
 
+  AC_MSG_CHECKING(for tcl version)
   for i in $PHP_TCLDIR/tclConfig.sh /usr/lib/tcl*/tclConfig.sh \
+        /usr/$PHP_LIBDIR/tcl*/tclConfig.sh \
         /usr/local/lib/tcl*/tclConfig.sh \
 	/System/Library/Frameworks/Tcl.framework/Versions/Current/tclConfig.sh;
   do
@@ -30,9 +32,14 @@ if test "$PHP_EXPECT" != "no"; then
       break
     fi
   done
+  if test -n "$TCL_VERSION" ; then
+    AC_MSG_RESULT($TCL_VERSION in $TCL_PREFIX)
+  else
+    AC_MSG_ERROR([not found])
+  fi
 
-  PHP_ADD_LIBRARY_WITH_PATH(tcl$TCL_VERSION, $TCL_PREFIX/lib, EXPECT_SHARED_LIBADD)
-  PHP_ADD_LIBRARY_WITH_PATH(expect, $LIBEXPECT_DIR/lib, EXPECT_SHARED_LIBADD)
+  PHP_ADD_LIBRARY_WITH_PATH(tcl$TCL_VERSION, $TCL_PREFIX/$PHP_LIBDIR, EXPECT_SHARED_LIBADD)
+  PHP_ADD_LIBRARY_WITH_PATH(expect, $LIBEXPECT_DIR/$PHP_LIBDIR, EXPECT_SHARED_LIBADD)
   PHP_ADD_INCLUDE($LIBEXPECT_INCLUDE_DIR)
 
   PHP_NEW_EXTENSION(expect, expect.c expect_fopen_wrapper.c, $ext_shared)
