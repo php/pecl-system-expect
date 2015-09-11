@@ -41,6 +41,10 @@ zend_function_entry expect_functions[] = {
 /* }}} */
 
 
+ZEND_DECLARE_MODULE_GLOBALS(expect)
+static PHP_GINIT_FUNCTION(expect);
+static PHP_GSHUTDOWN_FUNCTION(expect);
+
 /* {{{ expect_module_entry
  */
 zend_module_entry expect_module_entry = {
@@ -53,7 +57,11 @@ zend_module_entry expect_module_entry = {
 	NULL,
 	PHP_MINFO(expect),
 	PHP_EXPECT_VERSION,
-	STANDARD_MODULE_PROPERTIES
+	PHP_MODULE_GLOBALS(expect),
+	PHP_GINIT(expect),
+	PHP_GSHUTDOWN(expect),
+	NULL,
+	STANDARD_MODULE_PROPERTIES_EX
 };
 /* }}} */
 
@@ -61,22 +69,20 @@ zend_module_entry expect_module_entry = {
 ZEND_GET_MODULE(expect)
 #endif
 
-ZEND_DECLARE_MODULE_GLOBALS(expect)
-
 /* {{{ php_expect_init_globals
  */
-static void php_expect_init_globals (zend_expect_globals *globals TSRMLS_DC)
+static PHP_GINIT_FUNCTION(expect)
 {
-	globals->logfile_stream = NULL;
+	expect_globals->logfile_stream = NULL;
 }
 /* }}} */
 
 /* {{{ php_expect_destroy_globals
  */
-static void php_expect_destroy_globals(zend_expect_globals *globals TSRMLS_DC)
+static PHP_GSHUTDOWN_FUNCTION(expect)
 {
-	if (globals->logfile_stream) {
-		php_stream_close(globals->logfile_stream);
+	if (expect_globals->logfile_stream) {
+		php_stream_close(expect_globals->logfile_stream);
 	}
 }
 /* }}} */
