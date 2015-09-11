@@ -344,46 +344,48 @@ PHP_FUNCTION(expect_expectl)
 	}
 	ecases_ptr->pattern = NULL;
 	ecases_ptr->re = NULL;
-	ecases_ptr->value = NULL;
+	ecases_ptr->value = 0;
 	ecases_ptr->type = exp_end;
 
-	key = exp_expectv (fd, ecases);
+	int exp_retval = exp_expectv (fd, ecases);
+	int case_found = 0;
+	if (exp_retval >= 0) {
+		key = exp_retval;
 
-	int exp_match_len = exp_match_end - exp_match;
-	if (key >= 0 && z_match && exp_match && exp_match_len > 0) {
-		char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
-		strlcpy (tmp, exp_match, exp_match_len + 1);
-		zval_dtor (z_match);
-		array_init(z_match);
-		add_index_string(z_match, 0, tmp, 1);
-		/* Get case that was matched */
-		matchedcase = ecases[key];
-		/* If there are subpattern matches ... */
-		if (matchedcase.re != NULL && matchedcase.re->startp != NULL) {
-			int i;
-			/* iterate across all possible 9 subpatterns (a limitation of libexpect)
-			   and add matching substring to matches array */
-			for (i = 1; i <= 9; i++) {
-				if (matchedcase.re->startp[i] != NULL) {
-					int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i];
-					char *sub_match = (char *)emalloc (sizeof(char) * (sub_match_len + 1));
-					strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len + 1);
-					add_next_index_string(z_match, sub_match, 1);
-					efree (sub_match);
+		int exp_match_len = exp_match_end - exp_match;
+		if (z_match && exp_match && exp_match_len > 0) {
+			char *tmp = (char *)emalloc (sizeof(char) * (exp_match_len + 1));
+			strlcpy (tmp, exp_match, exp_match_len + 1);
+			zval_dtor (z_match);
+			array_init(z_match);
+			add_index_string(z_match, 0, tmp, 1);
+			/* Get case that was matched */
+			matchedcase = ecases[key];
+			/* If there are subpattern matches ... */
+			if (matchedcase.re != NULL && matchedcase.re->startp != NULL) {
+				int i;
+				/* iterate across all possible 9 subpatterns (a limitation of libexpect)
+				   and add matching substring to matches array */
+				for (i = 1; i <= 9; i++) {
+					if (matchedcase.re->startp[i] != NULL) {
+						int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i];
+						char *sub_match = (char *)emalloc (sizeof(char) * (sub_match_len + 1));
+						strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len + 1);
+						add_next_index_string(z_match, sub_match, 1);
+						efree (sub_match);
+					}
 				}
 			}
+			efree (tmp);
 		}
-		efree (tmp);
-	}
 
-	if (zend_hash_index_find (Z_ARRVAL_P(z_cases), key, (void **)&z_case) == SUCCESS) {
-		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) == SUCCESS) {
-			*return_value = **z_value;
-			zval_copy_ctor (return_value);
+		if (zend_hash_index_find (Z_ARRVAL_P(z_cases), key, (void **)&z_case) == SUCCESS) {
+			if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) == SUCCESS) {
+				*return_value = **z_value;
+				zval_copy_ctor (return_value);
+				case_found = 1;
+			}
 		}
-	}
-	else {
-		RETURN_LONG (key);
 	}
 
 	// Free compiled patterns:
@@ -394,8 +396,11 @@ PHP_FUNCTION(expect_expectl)
 		}
 		ecases_ptr++;
 	}
-
 	efree (ecases);
+
+	if (!case_found) {
+		RETURN_LONG(exp_retval);
+	}
 }
 /* }}} */
 
