@@ -22,7 +22,9 @@ if test "$PHP_EXPECT" != "no"; then
   done
 
   AC_MSG_CHECKING(for tcl version)
-  for i in $PHP_TCLDIR/tclConfig.sh /usr/lib/tcl*/tclConfig.sh \
+  for i in $PHP_TCLDIR/tclConfig.sh \
+        /usr/lib/tcl*/tclConfig.sh \
+        /usr/lib64/tcl*/tclConfig.sh \
         /usr/$PHP_LIBDIR/tcl*/tclConfig.sh \
         /usr/local/lib/tcl*/tclConfig.sh \
 	/System/Library/Frameworks/Tcl.framework/Versions/Current/tclConfig.sh;
