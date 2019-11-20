@@ -1,6 +1,6 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | PHP Version 5 and 7                                                  |
   +----------------------------------------------------------------------+
   | Copyright (c) 1997-2004 The PHP Group                                |
   +----------------------------------------------------------------------+
@@ -92,7 +92,11 @@ static PHP_GSHUTDOWN_FUNCTION(expect)
 static PHP_INI_MH(OnSetExpectTimeout)
 {
 	if (new_value) {
-		exp_timeout = atoi(new_value);
+#if PHP_MAJOR_VERSION >= 7
+		exp_timeout = atoi(ZSTR_VAL(new_value));
+#else
+        exp_timeout = atoi(new_value);
+#endif
 		return SUCCESS;
 	}
 	return FAILURE;
@@ -104,7 +108,11 @@ static PHP_INI_MH(OnSetExpectTimeout)
 static PHP_INI_MH(OnSetExpectMatchMax)
 {
 	if (new_value) {
+#if PHP_MAJOR_VERSION >= 7
+		exp_match_max = atoi(ZSTR_VAL(new_value));
+#else
 		exp_match_max = atoi(new_value);
+#endif
 		return SUCCESS;
 	}
 	return FAILURE;
@@ -117,10 +125,17 @@ static PHP_INI_MH(OnSetExpectMatchMax)
 static PHP_INI_MH(OnSetExpectLogUser)
 {
 	if (new_value) {
+#if PHP_MAJOR_VERSION >= 7
+		if (strncasecmp("on", ZSTR_VAL(new_value), sizeof("on")) == 0
+			|| strncasecmp("true", ZSTR_VAL(new_value), sizeof("true")) == 0
+			|| strncasecmp("yes", ZSTR_VAL(new_value), sizeof("yes")) == 0
+			|| strncasecmp("1", ZSTR_VAL(new_value), sizeof("1")) == 0) {
+#else
 		if (strncasecmp("on", new_value, sizeof("on")) == 0
 			|| strncasecmp("true", new_value, sizeof("true")) == 0
 			|| strncasecmp("yes", new_value, sizeof("yes")) == 0
 			|| strncasecmp("1", new_value, sizeof("1")) == 0) {
+#endif
 			exp_loguser = 1;
 		} else {
 			exp_loguser = 0;
@@ -139,8 +154,13 @@ static PHP_INI_MH(OnSetExpectLogFile)
 	if (EXPECT_G(logfile_stream)) {
 		php_stream_close(EXPECT_G(logfile_stream));
 	}
+#if PHP_MAJOR_VERSION >= 7
+   if (ZSTR_LEN(new_value) > 0) {
+       php_stream* stream = php_stream_open_wrapper (ZSTR_VAL(new_value), "a", 0, NULL);
+#else
 	if (new_value_length > 0) {
 		php_stream* stream = php_stream_open_wrapper (new_value, "a", 0, NULL);
+#endif
 		if (!stream) {
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "could not open log file for writing");
 			return FAILURE;
@@ -231,19 +251,35 @@ PHP_MINFO_FUNCTION(expect)
  */
 PHP_FUNCTION(expect_popen)
 {
+#if PHP_MAJOR_VERSION >= 7
+    zend_string *command = NULL;
+#else
 	char *command = NULL;
+#endif
 	int command_len;
 	FILE *fp;
 	php_stream *stream = NULL;
+#if PHP_MAJOR_VERSION >= 7
+    zval z_pid;
+#else
 	zval *z_pid;
+#endif
 
 	if (ZEND_NUM_ARGS() != 1) { WRONG_PARAM_COUNT; }
 
+#if PHP_MAJOR_VERSION >= 7
+    if (zend_parse_parameters (ZEND_NUM_ARGS() TSRMLS_CC, "S", &command) == FAILURE) {
+#else
 	if (zend_parse_parameters (ZEND_NUM_ARGS() TSRMLS_CC, "s", &command, &command_len) == FAILURE) {
+#endif
 		return;
 	}
 
+#if PHP_MAJOR_VERSION >= 7
+    if ((fp = exp_popen (ZSTR_VAL(command))) != NULL) {
+#else
 	if ((fp = exp_popen (command)) != NULL) {
+#endif
 		stream = php_stream_fopen_from_pipe (fp, "");
 	}
 	if (!stream) {
@@ -252,8 +288,12 @@ PHP_FUNCTION(expect_popen)
 
 	stream->flags |= PHP_STREAM_FLAG_NO_SEEK;
 
+#if PHP_MAJOR_VERSION >= 7
+    ZVAL_LONG (&z_pid, exp_pid);
+#else
 	MAKE_STD_ZVAL (z_pid);
 	ZVAL_LONG (z_pid, exp_pid);
+#endif
 	stream->wrapperdata = z_pid;
 
 	php_stream_to_zval(stream, return_value);
@@ -267,7 +307,11 @@ PHP_FUNCTION(expect_popen)
 PHP_FUNCTION(expect_expectl)
 {
 	struct exp_case *ecases, *ecases_ptr, matchedcase;
+#if PHP_MAJOR_VERSION >= 7
+    zval *z_stream, *z_cases, *z_match=NULL, *z_case, *z_value;
+#else
 	zval *z_stream, *z_cases, *z_match=NULL, **z_case, **z_value;
+#endif
 	php_stream *stream;
 	int fd, argc;
 	ulong key;
@@ -278,9 +322,17 @@ PHP_FUNCTION(expect_expectl)
 		return;
 	}
 
+#if PHP_MAJOR_VERSION >= 7
+   php_stream_from_zval (stream, z_stream);
+#else
 	php_stream_from_zval (stream, &z_stream);
+#endif
 
+#if PHP_MAJOR_VERSION >= 7
+    if (!&(stream->wrapperdata)) {
+#else
 	if (!stream->wrapperdata) {
+#endif
 		php_error_docref (NULL TSRMLS_CC, E_ERROR, "supplied argument is not a valid stream resource");
 		return;
 	}
@@ -295,12 +347,21 @@ PHP_FUNCTION(expect_expectl)
 
 	zend_hash_internal_pointer_reset (Z_ARRVAL_P(z_cases));
 
+#if PHP_MAJOR_VERSION >= 7
+    while ((z_case = zend_hash_get_current_data (Z_ARRVAL_P(z_cases))) != NULL)
+    {
+        zval *z_pattern, *z_exp_type;
+        zend_hash_get_current_key(Z_ARRVAL_P(z_cases), NULL, &key);
+
+        if (Z_TYPE_P(z_case) != IS_ARRAY) {
+#else
 	while (zend_hash_get_current_data (Z_ARRVAL_P(z_cases), (void **)&z_case) == SUCCESS)
 	{
 		zval **z_pattern, **z_exp_type;
 		zend_hash_get_current_key(Z_ARRVAL_P(z_cases), NULL, &key, 0);
 
 		if (Z_TYPE_PP(z_case) != IS_ARRAY) {
+#endif
 			efree (ecases);
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "expect case must be an array");
 			return;
@@ -310,20 +371,36 @@ PHP_FUNCTION(expect_expectl)
 		ecases_ptr->type = exp_glob;
 
 		/* Gather pattern */
+#if PHP_MAJOR_VERSION >= 7
+        if ((z_pattern = zend_hash_index_find(Z_ARRVAL_P(z_case), 0)) == NULL) {
+#else
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 0, (void **)&z_pattern) != SUCCESS) {
+#endif
 			efree (ecases);
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "missing parameter for pattern at index: 0");
 			return;
 		}
+#if PHP_MAJOR_VERSION >= 7
+        if (Z_TYPE_P(z_pattern) != IS_STRING) {
+#else
 		if (Z_TYPE_PP(z_pattern) != IS_STRING) {
+#endif
 			efree (ecases);
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "pattern must be of string type");
 			return;
 		}
+#if PHP_MAJOR_VERSION >= 7
+        ecases_ptr->pattern = Z_STRVAL_P(z_pattern);
+#else
 		ecases_ptr->pattern = Z_STRVAL_PP(z_pattern);
+#endif
 
 		/* Gather value */
+#if PHP_MAJOR_VERSION >= 7
+        if (zend_hash_index_find(Z_ARRVAL_P(z_case), 1) == NULL) {
+#else
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) != SUCCESS) {
+#endif
 			efree (ecases);
 			php_error_docref (NULL TSRMLS_CC, E_ERROR, "missing parameter for value at index: 1");
 			return;
@@ -331,18 +408,31 @@ PHP_FUNCTION(expect_expectl)
 		ecases_ptr->value = key;
 
 		/* Gather expression type (optional, default: EXPECT_GLOB) */
+#if PHP_MAJOR_VERSION >= 7
+        if ((z_exp_type = zend_hash_index_find(Z_ARRVAL_P(z_case), 2)) != NULL) {
+            if (Z_TYPE_P(z_exp_type) != IS_LONG) {
+#else
 		if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 2, (void **)&z_exp_type) == SUCCESS) {
 			if (Z_TYPE_PP(z_exp_type) != IS_LONG) {
+#endif
 				efree (ecases);
 				php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression type must be an integer constant");
 				return;
 			}
+#if PHP_MAJOR_VERSION >= 7
+            if (Z_LVAL_P(z_exp_type) != exp_glob && Z_LVAL_P(z_exp_type) != exp_exact && Z_LVAL_P(z_exp_type) != exp_regexp) {
+#else
 			if (Z_LVAL_PP(z_exp_type) != exp_glob && Z_LVAL_PP(z_exp_type) != exp_exact && Z_LVAL_PP(z_exp_type) != exp_regexp) {
+#endif
 				efree (ecases);
 				php_error_docref (NULL TSRMLS_CC, E_ERROR, "expression type must be either EXPECT_GLOB, EXPECT_EXACT or EXPECT_REGEXP");
 				return;
 			}
+#if PHP_MAJOR_VERSION >= 7
+            ecases_ptr->type = Z_LVAL_P(z_exp_type);
+#else
 			ecases_ptr->type = Z_LVAL_PP(z_exp_type);
+#endif
 		}
 
 		ecases_ptr++;
@@ -364,7 +454,11 @@ PHP_FUNCTION(expect_expectl)
 			strlcpy (tmp, exp_match, exp_match_len + 1);
 			zval_dtor (z_match);
 			array_init(z_match);
+#if PHP_MAJOR_VERSION >= 7
+            add_index_string(z_match, 0, tmp);
+#else
 			add_index_string(z_match, 0, tmp, 1);
+#endif
 			/* Get case that was matched */
 			matchedcase = ecases[key];
 			/* If there are subpattern matches ... */
@@ -377,7 +471,11 @@ PHP_FUNCTION(expect_expectl)
 						int sub_match_len = matchedcase.re->endp[i] - matchedcase.re->startp[i];
 						char *sub_match = (char *)emalloc (sizeof(char) * (sub_match_len + 1));
 						strlcpy (sub_match, matchedcase.re->startp[i], sub_match_len + 1);
+#if PHP_MAJOR_VERSION >= 7
+                        add_next_index_string(z_match, sub_match);
+#else
 						add_next_index_string(z_match, sub_match, 1);
+#endif
 						efree (sub_match);
 					}
 				}
@@ -385,9 +483,15 @@ PHP_FUNCTION(expect_expectl)
 			efree (tmp);
 		}
 
+#if PHP_MAJOR_VERSION >= 7
+        if ((z_case = zend_hash_index_find (Z_ARRVAL_P(z_cases), key)) != NULL) {
+            if ((z_value = zend_hash_index_find(Z_ARRVAL_P(z_case), 1)) != NULL) {
+                *return_value = *z_value;
+#else
 		if (zend_hash_index_find (Z_ARRVAL_P(z_cases), key, (void **)&z_case) == SUCCESS) {
 			if (zend_hash_index_find(Z_ARRVAL_PP(z_case), 1, (void **)&z_value) == SUCCESS) {
 				*return_value = **z_value;
+#endif
 				zval_copy_ctor (return_value);
 				case_found = 1;
 			}

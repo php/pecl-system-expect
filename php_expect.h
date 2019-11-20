@@ -1,6 +1,6 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | PHP Version 5 and 7                                                  |
   +----------------------------------------------------------------------+
   | Copyright (c) 1997-2004 The PHP Group                                |
   +----------------------------------------------------------------------+
@@ -37,7 +37,7 @@
 extern zend_module_entry expect_module_entry;
 #define phpext_expect_ptr &expect_module_entry
 
-#define PHP_EXPECT_VERSION "0.3.3"
+#define PHP_EXPECT_VERSION "0.3.4"
 
 #ifdef PHP_WIN32
 #define PHP_EXPECT_API __declspec(dllexport)
